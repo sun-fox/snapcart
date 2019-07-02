@@ -177,7 +177,7 @@ app.post("/snapcart/products/new", function(req, res) {
 app.put("/snapcart/products/:id/edit", function(req, res) {
   res.header("Access-Control-Allow-Origin", "*");
 
-  // var update_query="UPDATE `products` SET `model` = '"+req.body.model+"', `description` = '"+req.body.description+"', `sku` = '"+req.body.sku+"', `upc` = '"+req.body.upc+"', `ean` = '"+req.body.ean+"', `jan` = '"+req.body.jan+"', `isbn` = '"+req.body.isbn+"', `mpn` = '"+req.body.mpn+"', `location` = '"+req.body.location+"', `stock_status_id` = '"+req.body.stock_status_id+"', `manufacturer_id` = '"+req.body.manufacturer_id+"', `tax_class_id` = '"+req.body.tax_class_id+"'WHERE product_id="+req.params.id+";";
+// var update_query="UPDATE `products` SET `model` = '"+req.body.model+"', `description` = '"+req.body.description+"', `sku` = '"+req.body.sku+"', `upc` = '"+req.body.upc+"', `ean` = '"+req.body.ean+"', `jan` = '"+req.body.jan+"', `isbn` = '"+req.body.isbn+"', `mpn` = '"+req.body.mpn+"', `location` = '"+req.body.location+"', `stock_status_id` = '"+req.body.stock_status_id+"', `manufacturer_id` = '"+req.body.manufacturer_id+"', `tax_class_id` = '"+req.body.tax_class_id+"'WHERE product_id="+req.params.id+";";
 
   var content = req.body;
   var content_lenght = Object.keys(content).length;
@@ -235,6 +235,149 @@ app.get("/snapcart/products/vendor/:Mid", function(req, res) {
       throw err;
     }
     res.send(rows);
+  });
+});
+
+app.get("/snapcart/customer",function(req,res){
+  res.header("Access-Control-Allow-Origin", "*");
+  connection.query("SELECT * FROM customer", function(err, rows) {
+    if (err) {
+      throw err;
+    }
+    res.send(rows);
+  });
+});
+
+
+app.get("/snapcart/customer/:Cid",function(req,res){
+  res.header("Access-Control-Allow-Origin", "*");
+  console.log(req.params.Cid);
+  connection.query(
+    "SELECT * FROM customer WHERE customer_id=" + req.params.Cid + ";",
+    function(err, rows) {
+      if (err) {
+        throw err;
+      }
+      res.send(rows);
+    }
+  );
+});
+
+app.post("/snapcart/customer/new",function(req,res){
+  res.header("Access-Control-Allow-Origin", "*");
+  let post1_query =
+    "INSERT INTO customer(store_id,language_id,firstname,lastname,email,telephone,fax,password,salt,cart,wishlist,newsletter,address_id,custom_field,ip,status,safe,token,code,date_added) VALUES('" +
+    req.body.store_id +
+    "','" +
+    req.body.language_id +
+    "','" +
+    req.body.firstname +
+    "','" +
+    req.body.lastname +
+    "','" +
+    req.body.email +
+    "','" +
+    req.body.telephone +
+    "','" +
+    req.body.fax +
+    "','" +
+    req.body.password +
+    "','" +
+    req.body.salt +
+    "','" +
+    req.body.cart +
+    "','" +
+    req.body.wishlist +
+    "','" +
+    req.body.newsletter +
+    "','" +
+    req.body.address_id +
+    "','" +
+    req.body.custom_field +
+    "','" +
+    req.body.ip +
+    "','" +
+    req.body.status +
+    "','" +
+    req.body.safe +
+    "','" +
+    req.body.taken +
+    "','" +
+    req.body.code +
+    "','" +
+    req.body.date_added +
+    "')";
+
+  connection.query(post1_query, function(err, rows) {
+    if (err) {
+      throw err;
+    }
+    if (rows.affectedRows > 0) {
+      getLastRow_Customer(connection, res);
+    } else {
+      res.send("The Customer details was not inserted,Sorry!!");
+    }
+  });
+});
+function getLastRow_Customer(connection, res) {
+  res.header("Access-Control-Allow-Origin", "*");
+  connection.query(
+    "SELECT * FROM customer WHERE customer_id = (SELECT MAX(customer_id) from customer)",
+    function(err, rows) {
+      if (err) {
+        throw err;
+      }
+      res.send(rows);
+    }
+  );
+}
+
+app.put("/snapcart/customer/:id/edit",function(req,res){
+  res.header("Access-Control-Allow-Origin", "*");
+  var content = req.body;
+  var content_lenght = Object.keys(content).length;
+  if (content_lenght > 0) {
+    var update_query = "UPDATE customer SET ";
+    Object.entries(content).forEach(([key, value]) => {
+      if (typeof value !== "undefined") {
+        update_query += key + "='" + value + "',";
+      }
+    });
+    update_query = update_query.slice(0, -1);
+    update_query += " WHERE customer_id=" + req.params.id;
+  }
+
+  connection.query(update_query, function(err, rows) {
+    console.log(update_query)
+    if (err) {
+      throw err;
+    }
+    if (rows.affectedRows > 0) {
+      connection.query(
+        "SELECT * FROM customer WHERE customer_id = " + req.params.id + " ;",
+        function(err, rows) {
+          if (err) {
+            throw err;
+          }
+          res.send(rows);
+        }
+      );
+    } else {
+      res.send("The Customer details were not updated,Sorry!!");
+    }
+  });
+});
+
+app.delete("/snapcart/customer/:id/delete", function(req, res) {
+  res.header("Access-Control-Allow-Origin", "*");
+  var del_query =
+    "DELETE FROM `customer` WHERE customer_id=" + req.params.id + ";";
+  //console.log(del_query)
+  connection.query(del_query, function(err, rows) {
+    if (err) {
+      throw err;
+    }
+    res.send("The Customer credentials has been deleted,Thanks!!");
   });
 });
 
