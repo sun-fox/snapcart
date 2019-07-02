@@ -381,6 +381,103 @@ app.delete("/snapcart/customer/:id/delete", function(req, res) {
   });
 });
 
+app.post("/snapcart/orders/new",function(req,res){
+  res.header("Access-Control-Allow-Origin", "*");
+
+  var get_order_schema = "desc `order`";
+
+  connection.query(get_order_schema, async function(err, rows) {
+    if (err) {
+      throw err;
+    }
+
+    //Constructing order column names for insert query
+    const order_cols = [];
+    for(let row of rows){
+      await order_cols.push(row['Field']);
+    }
+    var order_cols_data = "(";
+    for(let order_col of order_cols){
+      order_cols_data += order_col+","
+    }
+    order_cols_data = order_cols_data.slice(0, -1);
+    order_cols_data += ") ";
+
+    //Constructing order column names for insert query
+    const order_values = [];
+    var content = req.body;
+    var content_lenght = Object.keys(content).length;
+    if (content_lenght > 0) {
+      var order_cols_value = "VALUES(";
+      Object.entries(content).forEach(([key, value]) => {
+        if (typeof value !== "undefined") {
+          
+          if(value.length > 0){
+            order_cols_value += "'"+value+"'"+","
+          }
+          else{
+            order_cols_value += "'0',"
+          }
+        }
+      });
+      order_cols_value = order_cols_value.slice(0, -1);
+      order_cols_value += ")";
+      
+      
+    }
+
+    var post_query = "INSERT INTO `order` "+ order_cols_data+ order_cols_value+" ;";
+    console.log(post_query);
+    connection.query(post_query, function(err, rows) {
+      if (err) {
+        throw err;
+      }
+      if (rows.affectedRows > 0) {
+        getLastRow_order(connection, res);
+      } else {
+        res.send("The Order has been placed,Thanks!!");
+      }
+    });
+  });
+});
+function getLastRow_Order(connection, res) {
+  res.header("Access-Control-Allow-Origin", "*");
+  connection.query(
+    "SELECT * FROM order WHERE order_id = (SELECT MAX(order_id) from order)",
+    function(err, rows) {
+      if (err) {
+        throw err;
+      }
+      res.send(rows);
+    }
+  );
+}
+
+app.get("/snapcart/orders",function(req,res){
+  res.header("Access-Control-Allow-Origin", "*");
+  connection.query("SELECT * FROM `order`", function(err, rows) {
+    if (err) {
+      throw err;
+    }
+    res.send(rows);
+  });
+});
+
+app.get("/snapcart/orders/:Oid",function(req,res){
+  res.header("Access-Control-Allow-Origin", "*");
+  console.log(req.params.Oid);
+  var qery="SELECT * FROM `order` WHERE order_id=" + req.params.Oid + ";";
+  console.log(qery);
+  connection.query(
+    qery,
+    function(err, rows) {
+      if (err) {
+        throw err;
+      }
+      res.send(rows);
+    }
+  );
+});
 //listening at port 3000
 app.listen(3000, "localhost", function() {
   console.log("The Snapcart Server Has Started");
