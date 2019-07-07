@@ -7,12 +7,17 @@ var express = require("express"),
   multer = require("multer"),
   bodyParser = require("body-parser"),
   exec = require("child_process").exec,
-  connection = mysql.createConnection({
+  connection;
+  
+function estblish_connec(db_name){
+   connection = mysql.createConnection({
     host: "localhost",
     user: "root",
     password: "",
-    database: "snapcart"
+    database: db_name
   });
+}
+ 
 app.use(bodyParser.urlencoded({ extended: true }));
 
 //Constructing File Name
@@ -55,16 +60,17 @@ var upload = multer({ storage: storage });
 
 // const express = require("express");
 // const app = express();
-const port = 3000;
+//const port = 3000;
 
 // Constructing complete file path
 var inputFile = "uploads/" + filename;
 
-app.post("/snapcart/import/:client_file_tablename", upload.single("filename"), function(
+app.post("/:db_name/import/:client_file_tablename", upload.single("filename"), function(
   req,
   res,
   next
 ) {
+  estblish_connec(req.params.db_name);
   // Get CSV Row Count After Upload
   countFileLines(inputFile);
   row_counter=0;
@@ -73,9 +79,54 @@ app.post("/snapcart/import/:client_file_tablename", upload.single("filename"), f
   importData(req, res);
 });
 
-// Get Products and Search Products
-app.get("/snapcart", function(req, res) {
+//array to store the details of all the items in the datalist
+var dataList = [];
+var headers = [];
+app.get("/:db_name/export/:client_file_tablename",function(req,res){
   res.header("Access-Control-Allow-Origin", "*");
+  estblish_connec(req.params.db_name);
+  var export_query="SELECT `COLUMN_NAME` FROM `INFORMATION_SCHEMA`.`COLUMNS` WHERE `TABLE_SCHEMA` = '"+req.params.db_name+"' AND `TABLE_NAME` = '"+req.params.client_file_tablename+"'";
+  console.log(export_query);
+  connection.query(export_query, function(err, rows) {
+    if (err) {
+      throw err;
+    }
+    let data=rows;
+    for(var i=0; i<data.length;i++)
+    {
+      headers.push(data[i].COLUMN_NAME);
+    }
+    //console.log(headers);
+  
+    connection.query("SELECT * FROM `"+req.params.client_file_tablename+"` ;", function(err, rows) {
+      if (err) {
+        throw err;
+      }
+      // console.log(rows)
+
+      for(var i=0; i<rows.length;i++)
+      {
+        dataList.push(Object.assign({}, rows[i]));
+      }
+
+      setTimeout(() => {
+        //console.log(dataList);
+      res.writeHead(200, {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': 'attachment; filename='+req.params.client_file_tablename+'.csv'
+      });
+      // whereas this part is in charge of telling what data should be parsed and be downloaded
+      //console.log(headers);
+      res.end(dataToCSV(dataList,headers),"binary");
+      }, 3000); 
+    });
+  });
+  });
+
+// Get Products and Search Products
+app.get("/:db_name", function(req, res) {
+  res.header("Access-Control-Allow-Origin", "*");
+  estblish_connec(req.params.db_name);
   var limit = req.query.limit; //either a value or 'undefined'
   var last_id = req.query.last_id;
   var keyword = req.query.keyword;
@@ -109,32 +160,69 @@ app.get("/snapcart", function(req, res) {
   });
 });
 
-app.get("/snapcart/:tblName", function(req, res) {
+app.get("/:db_name/:tblName", function(req, res) {
+  estblish_connec(req.params.db_name);
   getAll(res,req.params.tblName);
 });
 
-app.get("/snapcart/:tblName/:col_name/:id", function(req, res) {
+app.get("/:db_name/:tblName/:col_name/:id", function(req, res) {
+  estblish_connec(req.params.db_name);
   getSpecific(req,res,req.params.tblName,req.params.col_name);
 });
 
-app.post("/snapcart/:tblName/:id_col_name/new",function(req,res){
-  addItem(res,req,req.params.tblName,req.params.id_col_name);
+app.post("/:db_name/:tblName/:col_name/new",function(req,res){
+  estblish_connec(req.params.db_name);
+  addItem(res,req,req.params.tblName,req.params.col_name);
 });
 
-app.put("/snapcart/:tblName/:col_name/:id/edit", function(req, res) {
+app.put("/:db_name/:tblName/:col_name/:id/edit", function(req, res) {
+  estblish_connec(req.params.db_name);
   item_update(req,res,req.params.tblName,req.params.col_name);
 });
 
-app.delete("/snapcart/:tblName/:col_name/:id/delete", function(req, res) {
+app.delete("/:db_name/:tblName/:col_name/:id/delete", function(req, res) {
+  estblish_connec(req.params.db_name);
   item_delete(req,res,req.params.tblName,req.params.col_name);
 });
 
 //listening at port 3000
 app.listen(3000, "localhost", function() {
-  console.log("The Snapcart Server Has Started");
+  console.log("The Server Has Started on port 3000!");
 });
 
 //MODULAR FUNCTIONS
+// The function gets a list of objects ('dataList' arg), each one would be a single row in the future-to-be CSV file
+// The headers to the columns would be sent in an array ('headers' args). It is taken as the second arg
+function dataToCSV(dataList,headers){
+  //console.log("dataTOCSV",headers);
+  var allObjects = [];
+  // Pushing the headers, as the first arr in the 2-dimensional array 'allObjects' would be the first row
+  allObjects.push(headers);
+ 
+  //Now iterating through the list and build up an array that contains the data of every object in the list, in the same order of the headers
+  dataList.forEach(function(object){
+      var arr = [];
+      Object.entries(object).forEach(
+        ([key, value]) => arr.push(value)
+    );
+      // Adding the array as additional element to the 2-dimensional array. It will evantually be converted to a single row
+      allObjects.push(arr)
+  });
+
+ // Initializing the output in a new variable 'csvContent'
+  var csvContent = "";
+
+  // The code below takes two-dimensional array and converts it to be strctured as CSV
+  // *** It can be taken apart from the function, if all you need is to convert an array to CSV
+  allObjects.forEach(function(infoArray, index){
+    var dataString = infoArray.join(",");
+    csvContent += index < allObjects.length ? dataString+ "\n" : dataString;
+  }); 
+
+  // Returning the CSV output
+  return csvContent;
+}
+
 //Functions making code modular
 // CSV ROW COUNTER
 function countFileLines(filePath) {
@@ -178,7 +266,7 @@ async function doSomething(line, req, res) {
     col_header = line;
   }
   await row_counter++;
-  console.log(row_counter+" = "+line);
+  //console.log(row_counter+" = "+line);
   if (col_header.length != 0 && row_counter === 1) {
     primary_key_colname = col_header[0];
     // IGNORING THE COLUMN HEADER ROW
@@ -188,7 +276,7 @@ async function doSomething(line, req, res) {
     UploaderLogicFunc(inserter_query,updater_query,line);
     // output_array.push(insert_query);
     // output_array.push(update_query + ";");
-    console.log(row_counter+" vs "+total_rows);
+    //console.log(row_counter+" vs "+total_rows);
     if (row_counter == total_rows) {
         res.send("Import Completed Successfully!!");
     //   res.send(output_array);
@@ -206,14 +294,14 @@ function UploaderLogicFunc(inserter_query,updater_query,line){
       }
 
       row_availability = row[0]["row_count"];
-      console.log(row_availability);
+      //console.log(row_availability);
       if (row_availability === 1) {
-        // console.log(update_query);
+        // //console.log(update_query);
         connection.query(updater_query, function(err, rows) {
           if (err) {
             throw err;
           }if (rows.affectedRows > 0) {
-            console.log("Row Updated");
+            //console.log("Row Updated");
           } else {
             res.send("Error!! Please try again.");
           }
@@ -224,7 +312,7 @@ function UploaderLogicFunc(inserter_query,updater_query,line){
             throw err;
           }
           if (rows.affectedRows > 0) {
-            console.log("Row Inserted");
+            //console.log("Row Inserted");
           } else {
             res.send("Error!! Please try again.");
           }
@@ -241,24 +329,24 @@ function insertQueryGenerator(line){
   ") VALUES(" +
   (line.map(line_row => `'${line_row}'`).join(",")).split(/,(.+)/)[1] +
   ");";
-  console.log(insert_query);
+  //console.log(insert_query);
   return insert_query;
 }
 
 function UpdateQueryGenerator(line){
 //CONSTRUCTING UPDATE QUERY
 var update_query = "UPDATE testing_tbl SET ";
-//console.log(col_header);
+////console.log(col_header);
 for (let col in col_header) {
   if (col_header[col] != primary_key_colname) {
-    //console.log("col_header   "+col_header[col]);
+    ////console.log("col_header   "+col_header[col]);
     update_query = update_query + col_header[col] + "='" + line[col] + "',";
   } else {
     update_query_id = " WHERE " + primary_key_colname + "=" + line[0];
   }
 }
 update_query = update_query.slice(0, -1) + update_query_id+" ;";
-console.log(update_query);
+//console.log(update_query);
 return update_query;
 }
 //gets the items present in the table
