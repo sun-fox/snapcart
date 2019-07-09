@@ -24,7 +24,11 @@ A)     Functioning of the Route                                          Request
 
 7.To export database as ".csv" extension file in downloads               POST Request        https://domain_name/App_database_name/export/tablename
 
-So, These 7 routes can handle any operation from or on the database, and yes these operations are agnostic of "App_database_name","tableName","columnName" and "unique_id".
+8.To register users on the Web_App i.e., SignUp Routes                   POST Request        https://domain_name/App_database_name/register
+
+9.To login users on the Web App i.e., SignIn Routes                      POST Request        https://domain_name/App_database_name/login
+
+So, These 9 routes can handle any operation from or on the database, and yes these operations are agnostic of "App_database_name","tableName","columnName" and "unique_id".
 
 This is not an open source API, and it's © copyright are reserved solely with the creator.  
 </pre>
